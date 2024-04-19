@@ -17,3 +17,9 @@ def download_attachment(access_token, attachment, path, email):
     smart = smartsheet.Smartsheet(access_token)
     smart.assume_user(email)
     return smart.Attachments.download_attachment(attachment, path)
+
+
+def delete_attachment(access_token, attachment_id, sheet_id, email):
+    smart = smartsheet.Smartsheet(access_token)
+    smart.assume_user(email)
+    return smart.Attachments.delete_attachment(sheet_id, attachment_id)

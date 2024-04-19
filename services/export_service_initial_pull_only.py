@@ -43,7 +43,7 @@ class ExportServiceInitialPullOnly:
 
         return logger
 
-    def download_attachments(self):
+    def download_attachments(self, delete_attachments=False):
         self.logger.info("Beginning initial data pull")
 
         user_list = []
@@ -189,6 +189,7 @@ class ExportServiceInitialPullOnly:
                                         file_name = None
 
                                     file_description_text = f"{file_name} - {file_created_by_name} - {file_created_by_email} - {file_created_at} - {file_id}\n"
+                                    file_description_text = self.replace_symbol(file_description_text)
                                     attachment_file_update = open(attachment_file_path, "r+") # open with read/write access, starting at beginning
                                     content = attachment_file_update.read()
                                     if file_description_text not in content or file_description_text not in attachment_manifest_file_content: # check if attachment is already logged; if not, download it and log it
@@ -200,6 +201,9 @@ class ExportServiceInitialPullOnly:
                                         attachment_manifest_file_update.close()
 
                                     attachment_file_update.close()
+                                    if delete_attachments:
+                                        smar_helper.delete_attachment(config.SMARTSHEET_ACCESS_TOKEN,
+                                                                      file_id, sheet['id'], sheet['owner_email'])
                                 except Exception as e:
                                     self.logger.error(f"There was a problem downloading {sheet['name']} ({sheet['id']}): {e}")
                                     continue
@@ -213,7 +217,8 @@ class ExportServiceInitialPullOnly:
             print(f"There was an error in the process: {e}")
 
     def replace_symbol(self, filepath):
-        for symbol in ['<', '>', ':', '"', '/', '\\', '|', '?', '*']:
+        for symbol in ['<', '>', ':', '"', '/', '\\', '|', '?', '*', '\u202f', '\u200b', '\u200c', '\u200d', '\u200e',
+                       '\u200f', '\u2028', '\u2029', '\u202a', '\u202b', '\u202c', '\u202d', '\u202e', '\u2060']:
             if symbol in filepath:
                 filepath = filepath.replace(symbol, '_')
         return filepath
