@@ -123,7 +123,7 @@ class ExportServiceInitialPullOnly:
             self.logger.info(f"{len(sheets_list)} sheets to process")
             print(f"{len(sheets_list)} sheets to process")
 
-            parent_path = os.path.join(os.path.curdir, 'smartsheet_attachments')
+            parent_path = os.path.join(os.path.curdir, 'smartsheet_attachments_test_cases')
             if not os.path.exists(parent_path):
                 os.mkdir(parent_path)
 
