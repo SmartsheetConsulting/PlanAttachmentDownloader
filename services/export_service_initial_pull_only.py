@@ -2,8 +2,11 @@ import helpers.smar_helper as smar_helper
 import logging
 import datetime
 import os
+import errno
 import json
 import requests
+import time
+import re
 import config.config as config
 
 
@@ -64,10 +67,11 @@ class ExportServiceInitialPullOnly:
                 total_pages = 1
                 while page <= total_pages:
                     try:
-                        url = f"https://api.smartsheet.com/2.0/users?page={page}&pageSize=1000"
+                        url = f"https://api.smartsheet.com/2.0/users?page={page}&pageSize=10"
                         response = requests.request("GET", url, headers=headers, data="", verify=False)
                         json_response = response.json()
                         total_pages = json_response['totalPages']
+                        total_pages = 1
 
                         user_list.extend(json_response['data'])
                         page = page + 1
@@ -118,6 +122,7 @@ class ExportServiceInitialPullOnly:
             if not os.path.exists(parent_path):
                 os.mkdir(parent_path)
 
+
             attachment_manifest_path = os.path.join(parent_path, 'all_attachments.txt')
             if not os.path.exists(attachment_manifest_path):
                 open(attachment_manifest_path, 'w')
@@ -147,6 +152,7 @@ class ExportServiceInitialPullOnly:
                             else:
                                 os.mkdir(sheet_folder_path)
                         except Exception as e:
+                            print(f"There was a problem creating a sheet folder for sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}")
                             self.logger.error(
                                 f"There was a problem creating a sheet folder for sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}")
                             continue
@@ -154,6 +160,11 @@ class ExportServiceInitialPullOnly:
                         attachment_folder_path = os.path.join(sheet_folder_path, 'attachments')
                         if not os.path.exists(attachment_folder_path):
                             os.mkdir(attachment_folder_path)
+
+                        if not os.path.exists(attachment_folder_path) or not self.test_filepath_validity(attachment_folder_path):
+                            time.sleep(0.500)  # Is it a race condition? Let's wait a bit and check again
+                            if not os.path.exists(attachment_folder_path):
+                                os.mkdir(attachment_folder_path)
 
                         attachment_list_file_path = os.path.join(sheet_folder_path, 'attachments.txt')
                         if not os.path.exists(attachment_list_file_path):
@@ -195,7 +206,14 @@ class ExportServiceInitialPullOnly:
                                     attachment_file_update = open(attachment_list_file_path, "r+") # open with read/write access, starting at beginning
                                     content = attachment_file_update.read()
                                     if file_description_text not in content or file_description_text not in attachment_manifest_file_content: # check if attachment is already logged; if not, download it and log it
-                                        smar_helper.download_attachment(config.SMARTSHEET_ACCESS_TOKEN, attachment_details, attachment_folder_path, sheet['owner_email'], self.replace_symbol(file_name))
+                                        adjusted_file_name = self.replace_symbol(file_name)
+                                        attachment_download_filepath = os.path.join(attachment_folder_path, adjusted_file_name)
+                                        if not self.test_filepath_validity(attachment_download_filepath):
+                                            file_extension = os.path.splitext(adjusted_file_name)[1]
+                                            adjusted_file_name = f"{file_id}{file_extension}"
+                                            self.logger.warning(f"Adjusting filename '{file_name}' to '{adjusted_file_name}' due to invalid characters")
+
+                                        smar_helper.download_attachment(config.SMARTSHEET_ACCESS_TOKEN, attachment_details, attachment_folder_path, sheet['owner_email'], adjusted_file_name)
                                         attachment_file_update.write(file_description_text)
 
                                         attachment_manifest_file_update = open(attachment_manifest_path, 'a')
@@ -207,6 +225,7 @@ class ExportServiceInitialPullOnly:
                                         smar_helper.delete_attachment(config.SMARTSHEET_ACCESS_TOKEN,
                                                                       file_id, sheet['id'], sheet['owner_email'])
                                 except Exception as e:
+                                    print(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}")
                                     self.logger.error(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}")
                                     continue
                     else:
@@ -219,8 +238,64 @@ class ExportServiceInitialPullOnly:
             print(f"There was an error in the process: {e}")
 
     def replace_symbol(self, filepath):
-        for symbol in ['<', '>', ':', '"', '/', '\\', '|', '?', '*', '\u202f', '\u200b', '\u200c', '\u200d', '\u200e',
-                       '\u200f', '\u2028', '\u2029', '\u202a', '\u202b', '\u202c', '\u202d', '\u202e', '\u2060']:
+        re.sub(r'[^\x00-\x7f]', r' ', filepath)
+        for symbol in ['<',
+                       '>',
+                       ':',
+                       '"',
+                       '/',
+                       '\\',
+                       '|',
+                       '?',
+                       '*',
+                       '\u00a0',
+                       '\u1680',
+                       '\u180e',
+                       '\u2000',
+                       '\u2001',
+                       '\u2002',
+                       '\u2003',
+                       '\u2004',
+                       '\u2005',
+                       '\u2006',
+                       '\u2007',
+                       '\u2008',
+                       '\u2009',
+                       '\u200a',
+                       '\u200b',
+                       '\u200c',
+                       '\u200d',
+                       '\u200e',
+                       '\u200f',
+                       '\u2028',
+                       '\u2029',
+                       '\u202a',
+                       '\u202b',
+                       '\u202c',
+                       '\u202d',
+                       '\u202e',
+                       '\u202f',
+                       '\u205f',
+                       '\u2060',
+                       '\u3000',
+                       '\ufeff',
+                       '\x00']:
             if symbol in filepath:
                 filepath = filepath.replace(symbol, '_')
         return filepath
+
+    def test_filepath_validity(self, filepath):
+        try:
+            os.lstat(filepath)
+        except OSError as exc:
+            if hasattr(exc, 'winerror'):
+                if exc.winerror == 123:  # Windows-specific error code indicating an invalid pathname.
+                    print(f"Invalid pathname: {filepath}: {exc}")
+                    self.logger.warning(f"Invalid pathname: {filepath}: {exc}")
+                    return False
+            elif exc.errno in {errno.ENAMETOOLONG, errno.ERANGE}:
+                print(f"Invalid pathname: {filepath}: {exc}")
+                self.logger.warning(f"Invalid pathname: {filepath}: {exc}")
+                return False
+
+        return True
