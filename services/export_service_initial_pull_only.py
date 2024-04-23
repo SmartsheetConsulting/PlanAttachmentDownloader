@@ -67,11 +67,10 @@ class ExportServiceInitialPullOnly:
                 total_pages = 1
                 while page <= total_pages:
                     try:
-                        url = f"https://api.smartsheet.com/2.0/users?page={page}&pageSize=10"
+                        url = f"https://api.smartsheet.com/2.0/users?page={page}&pageSize=1000"
                         response = requests.request("GET", url, headers=headers, data="", verify=False)
                         json_response = response.json()
                         total_pages = json_response['totalPages']
-                        total_pages = 1
 
                         user_list.extend(json_response['data'])
                         page = page + 1
