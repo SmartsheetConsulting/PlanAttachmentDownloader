@@ -237,7 +237,6 @@ class ExportServiceInitialPullOnly:
             print(f"There was an error in the process: {e}")
 
     def replace_symbol(self, filepath):
-        re.sub(r'[^\x00-\x7f]', r' ', filepath)
         filepath = re.sub(r'[^\x00-\x7f]', r' ', filepath)
         for symbol in ['<',
                        '>',
