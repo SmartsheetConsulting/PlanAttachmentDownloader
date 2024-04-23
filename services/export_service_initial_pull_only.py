@@ -47,7 +47,7 @@ class ExportServiceInitialPullOnly:
         return logger
 
     def download_attachments(self, delete_attachments=False):
-        self.logger.info("Beginning initial data pull")
+        self.logger.info("Beginning Test Cases")
 
         user_list = []
         sheets_list = []
@@ -62,26 +62,31 @@ class ExportServiceInitialPullOnly:
                 'Authorization': f"Bearer {config.SMARTSHEET_ACCESS_TOKEN}"
             }
 
-            try:
-                page = 1
-                total_pages = 1
-                while page <= total_pages:
-                    try:
-                        url = f"https://api.smartsheet.com/2.0/users?page={page}&pageSize=10"
-                        response = requests.request("GET", url, headers=headers, data="", verify=False)
-                        json_response = response.json()
-                        total_pages = json_response['totalPages']
-                        total_pages = 1
+            user_list = [{"email": "jason.moy@exxonmobile.com"},
+                         {"email": "aaron.m.tschirhart@esso.ca"},
+                         {"email": "david.evans@esso.ca"},
+                         {"email": "daniel.k.nomanbhoy@exxonmobil.com"}]
 
-                        user_list.extend(json_response['data'])
-                        page = page + 1
-                    except Exception as e:
-                        print(f"{e}")
-                        self.logger.error(f"{e}")
-            except Exception as e:
-                self.logger.error(f"There was a problem retrieving all users: {e}")
-                print(f"There was a problem retrieving all users: {e}")
-                return
+            # try:
+            #     page = 1
+            #     total_pages = 1
+            #     while page <= total_pages:
+            #         try:
+            #             url = f"https://api.smartsheet.com/2.0/users?page={page}&pageSize=10"
+            #             response = requests.request("GET", url, headers=headers, data="", verify=False)
+            #             json_response = response.json()
+            #             total_pages = json_response['totalPages']
+            #             total_pages = 1
+            #
+            #             user_list.extend(json_response['data'])
+            #             page = page + 1
+            #         except Exception as e:
+            #             print(f"{e}")
+            #             self.logger.error(f"{e}")
+            # except Exception as e:
+            #     self.logger.error(f"There was a problem retrieving all users: {e}")
+            #     print(f"There was a problem retrieving all users: {e}")
+            #     return
 
             for idx, user in enumerate(user_list):
                 try:
@@ -238,7 +243,7 @@ class ExportServiceInitialPullOnly:
             print(f"There was an error in the process: {e}")
 
     def replace_symbol(self, filepath):
-        re.sub(r'[^\x00-\x7f]', r' ', filepath)
+        filepath = re.sub(r'[^\x00-\x7f]', r' ', filepath)
         for symbol in ['<',
                        '>',
                        ':',
