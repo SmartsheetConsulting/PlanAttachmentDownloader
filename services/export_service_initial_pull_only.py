@@ -239,6 +239,7 @@ class ExportServiceInitialPullOnly:
 
     def replace_symbol(self, filepath):
         re.sub(r'[^\x00-\x7f]', r' ', filepath)
+        filepath = re.sub(r'[^\x00-\x7f]', r' ', filepath)
         for symbol in ['<',
                        '>',
                        ':',
