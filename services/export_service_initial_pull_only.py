@@ -226,7 +226,9 @@ class ExportServiceInitialPullOnly:
                                                                             attachment_details,
                                                                             attachment_folder_path,
                                                                             sheet['owner_email'],
-                                                                            adjusted_file_name)
+                                                                            adjusted_file_name,
+                                                                            logger=self.logger,
+                                                                            root_path=parent_path)
                                         except Exception as e:
                                             print(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}. Trying again.")
                                             self.logger.warning(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}. Trying again.")
@@ -235,7 +237,9 @@ class ExportServiceInitialPullOnly:
                                                                             attachment_details,
                                                                             attachment_folder_path,
                                                                             sheet['owner_email'],
-                                                                            adjusted_file_name)
+                                                                            adjusted_file_name,
+                                                                            logger=self.logger,
+                                                                            root_path=parent_path)
                                         attachment_file_update.write(file_description_text)
 
                                         attachment_manifest_file_update = open(attachment_manifest_path, 'a')
@@ -251,7 +255,7 @@ class ExportServiceInitialPullOnly:
                                                                       file_id, sheet['id'], sheet['owner_email'])
                                 except Exception as e:
                                     print(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}")
-                                    self.logger.error(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}")
+                                    self.logger.exception(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}", stack_info=True)
                                     continue
                     else:
                         self.logger.info(f"There are no attachments for sheet '{sheet['name']}' (sheetId: {sheet['id']})")
