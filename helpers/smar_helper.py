@@ -48,8 +48,11 @@ def download_attachment(access_token, attachment, path, email, alternate_file_na
                         dlfile.write(chunk)
         except Exception as e:
             if root_path is not None:
-                logger.exception(f"Error: {e}. Attempting to rename file and download to root path: {download_path}", stack_info=True)
-                download_path = os.path.join(root_path, attachment.id)
+                file_extension = os.path.splitext(response.filename)[1]
+                adjusted_file_name = f"{attachment.id}{file_extension}"
+                download_path = os.path.join(root_path, adjusted_file_name)
+                logger.exception(f"Error: {e}. Attempting to rename file and download to root path: {download_path}",
+                                 stack_info=True)
                 with open(download_path, "wb") as dlfile:
                     logger.info(f"Successfully opened file for writing")
                     with contextlib.closing(resp):
