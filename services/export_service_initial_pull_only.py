@@ -7,6 +7,7 @@ import json
 import requests
 import time
 import re
+import pathvalidate as pathvalidate
 import config.config as config
 
 
@@ -166,7 +167,7 @@ class ExportServiceInitialPullOnly:
                         if not os.path.exists(attachment_folder_path):
                             os.mkdir(attachment_folder_path)
 
-                        if not os.path.exists(attachment_folder_path) or not self.test_filepath_validity(attachment_folder_path):
+                        if not os.path.exists(attachment_folder_path) or not self.test_filepath_validity(attachment_folder_path):  # Check again in case of race condition
                             time.sleep(0.500)  # Is it a race condition? Let's wait a bit and check again
                             if not os.path.exists(attachment_folder_path):
                                 os.mkdir(attachment_folder_path)
@@ -211,6 +212,8 @@ class ExportServiceInitialPullOnly:
                                     attachment_file_update = open(attachment_list_file_path, "r+") # open with read/write access, starting at beginning
                                     content = attachment_file_update.read()
                                     if file_description_text not in content or file_description_text not in attachment_manifest_file_content: # check if attachment is already logged; if not, download it and log it
+                                        self.logger.info(f"Downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']})")
+                                        print(f"Downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']})")
                                         adjusted_file_name = self.replace_symbol(file_name)
                                         attachment_download_filepath = os.path.join(attachment_folder_path, adjusted_file_name)
                                         if not self.test_filepath_validity(attachment_download_filepath):
@@ -218,12 +221,29 @@ class ExportServiceInitialPullOnly:
                                             adjusted_file_name = f"{file_id}{file_extension}"
                                             self.logger.warning(f"Adjusting filename '{file_name}' to '{adjusted_file_name}' due to invalid characters")
 
-                                        smar_helper.download_attachment(config.SMARTSHEET_ACCESS_TOKEN, attachment_details, attachment_folder_path, sheet['owner_email'], adjusted_file_name)
+                                        try:
+                                            smar_helper.download_attachment(config.SMARTSHEET_ACCESS_TOKEN,
+                                                                            attachment_details,
+                                                                            attachment_folder_path,
+                                                                            sheet['owner_email'],
+                                                                            adjusted_file_name)
+                                        except Exception as e:
+                                            print(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}. Trying again.")
+                                            self.logger.warning(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}. Trying again.")
+                                            time.sleep(1)
+                                            smar_helper.download_attachment(config.SMARTSHEET_ACCESS_TOKEN,
+                                                                            attachment_details,
+                                                                            attachment_folder_path,
+                                                                            sheet['owner_email'],
+                                                                            adjusted_file_name)
                                         attachment_file_update.write(file_description_text)
 
                                         attachment_manifest_file_update = open(attachment_manifest_path, 'a')
                                         attachment_manifest_file_update.write(file_description_text)
                                         attachment_manifest_file_update.close()
+                                    else:
+                                        self.logger.info(f"Already downloaded attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']})")
+                                        print(f"Already downloaded attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']})")
 
                                     attachment_file_update.close()
                                     if delete_attachments:
@@ -243,6 +263,7 @@ class ExportServiceInitialPullOnly:
             print(f"There was an error in the process: {e}")
 
     def replace_symbol(self, filepath):
+        filepath = pathvalidate.sanitize_filename(filepath)
         filepath = re.sub(r'[^\x00-\x7f]', r' ', filepath)
         for symbol in ['<',
                        '>',
@@ -253,6 +274,7 @@ class ExportServiceInitialPullOnly:
                        '|',
                        '?',
                        '*',
+                       '$',
                        '\u00a0',
                        '\u1680',
                        '\u180e',
