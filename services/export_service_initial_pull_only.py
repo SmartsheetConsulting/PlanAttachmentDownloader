@@ -147,7 +147,7 @@ class ExportServiceInitialPullOnly:
                 sheet_folder_name = f"{sheet['id']} - {sheet['name']}"
                 sheet_folder_name = self.replace_symbol(sheet_folder_name)
                 sheet_folder_path = os.path.join(owner_folder_path, sheet_folder_name)
-                alternate_sheet_folder_path = os.path.join(owner_folder_path, sheet['id'])
+                alternate_sheet_folder_path = os.path.join(owner_folder_path, f"{sheet['id']}")
                 if not os.path.exists(sheet_folder_path):
                     try:
                         os.mkdir(sheet_folder_path)
