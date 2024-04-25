@@ -35,9 +35,9 @@ def download_attachment(access_token, attachment, path, email, alternate_file_na
                 }
 
         if alternate_file_name is not None:
-            response.filename = alternate_file_name
+            response['filename'] = alternate_file_name
 
-        download_path = os.path.join(path, response.filename)
+        download_path = os.path.join(path, response['filename'])
         if not os.path.exists(path):
             os.makedirs(path)
         try:
@@ -48,7 +48,7 @@ def download_attachment(access_token, attachment, path, email, alternate_file_na
                         dlfile.write(chunk)
         except Exception as e:
             if root_path is not None:
-                file_extension = os.path.splitext(response.filename)[1]
+                file_extension = os.path.splitext(response['filename'])[1]
                 adjusted_file_name = f"{attachment.id}{file_extension}"
                 download_path = os.path.join(root_path, adjusted_file_name)
                 logger.exception(f"Error: {e}. Attempting to rename file and download to root path: {download_path}",
