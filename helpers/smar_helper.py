@@ -46,20 +46,31 @@ def download_attachment(access_token, attachment, path, email, alternate_file_na
                 with contextlib.closing(resp):
                     for chunk in resp.iter_content(2**16):
                         dlfile.write(chunk)
-        except Exception as e:
-            if root_path is not None:
+        except Exception as e1:
+            try:
                 file_extension = os.path.splitext(response['filename'])[1]
                 adjusted_file_name = f"{attachment.id}{file_extension}"
-                download_path = os.path.join(root_path, adjusted_file_name)
-                logger.exception(f"Error: {e}. Attempting to rename file and download to root path: {download_path}",
+                download_path = os.path.join(path, adjusted_file_name)
+                logger.exception(f"Error: {e1}. Attempting to rename file and download again: {download_path}",
                                  stack_info=True)
                 with open(download_path, "wb") as dlfile:
-                    logger.info(f"Successfully opened file for writing")
+                    logger.info(f"Successfully opened file for writing with sanitized file name.")
                     with contextlib.closing(resp):
-                        for chunk in resp.iter_content(2**16):
+                        for chunk in resp.iter_content(2 ** 16):
                             dlfile.write(chunk)
-            else:
-                raise
+            except Exception as e2:
+                if root_path is not None:
+                    download_path = os.path.join(root_path, adjusted_file_name)
+                    logger.exception(
+                        f"Error: {e2}. Attempting to rename file and download to root path instead: {download_path}",
+                        stack_info=True)
+                    with open(download_path, "wb") as dlfile:
+                        logger.info(f"Successfully opened file for writing with sanitized file name and root path.")
+                        with contextlib.closing(resp):
+                            for chunk in resp.iter_content(2 ** 16):
+                                dlfile.write(chunk)
+                else:
+                    raise
         return response
     else:
         return {
