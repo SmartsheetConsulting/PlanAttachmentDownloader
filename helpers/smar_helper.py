@@ -16,12 +16,12 @@ def get_attachment(access_token, sheet, attachment, email):
     return smart.Attachments.get_attachment(sheet, attachment)
 
 
-def download_attachment(access_token, attachment, path, email, alternate_file_name=None, logger=None, root_path=None):
+def download_attachment(access_token, attachment, path, email, file_name, alternate_file_name=None, logger=None):
     smart = smartsheet.Smartsheet(access_token)
     smart.assume_user(email)
 
     if not os.path.isdir(path):
-        raise ValueError("download_path must be a directory.")
+        raise ValueError(f"download path {path} must be a directory.")
 
     resp = requests.get(attachment.url, stream=True)
 
@@ -30,12 +30,9 @@ def download_attachment(access_token, attachment, path, email, alternate_file_na
                     "result_code": 0,
                     "message": "SUCCESS",
                     "resp": resp,
-                    "filename": attachment.name,
+                    "filename": file_name,
                     "download_directory": path,
                 }
-
-        if alternate_file_name is not None:
-            response['filename'] = alternate_file_name
 
         download_path = os.path.join(path, response['filename'])
         if not os.path.exists(path):
@@ -47,30 +44,14 @@ def download_attachment(access_token, attachment, path, email, alternate_file_na
                     for chunk in resp.iter_content(2**16):
                         dlfile.write(chunk)
         except Exception as e1:
-            try:
-                file_extension = os.path.splitext(response['filename'])[1]
-                adjusted_file_name = f"{attachment.id}{file_extension}"
-                download_path = os.path.join(path, adjusted_file_name)
-                logger.exception(f"Error: {e1}. Attempting to rename file and download again: {download_path}",
-                                 stack_info=True)
-                with open(download_path, "wb") as dlfile:
-                    logger.info(f"Successfully opened file for writing with sanitized file name.")
-                    with contextlib.closing(resp):
-                        for chunk in resp.iter_content(2 ** 16):
-                            dlfile.write(chunk)
-            except Exception as e2:
-                if root_path is not None:
-                    download_path = os.path.join(root_path, adjusted_file_name)
-                    logger.exception(
-                        f"Error: {e2}. Attempting to rename file and download to root path instead: {download_path}",
-                        stack_info=True)
-                    with open(download_path, "wb") as dlfile:
-                        logger.info(f"Successfully opened file for writing with sanitized file name and root path.")
-                        with contextlib.closing(resp):
-                            for chunk in resp.iter_content(2 ** 16):
-                                dlfile.write(chunk)
-                else:
-                    raise
+            download_path = os.path.join(path, alternate_file_name)
+            logger.exception(f"Error: {e1}. Attempting to rename file and download again: {download_path}",
+                             stack_info=True)
+            with open(download_path, "wb") as dlfile:
+                logger.info(f"Successfully opened file for writing with sanitized file name.")
+                with contextlib.closing(resp):
+                    for chunk in resp.iter_content(2 ** 16):
+                        dlfile.write(chunk)
         return response
     else:
         return {

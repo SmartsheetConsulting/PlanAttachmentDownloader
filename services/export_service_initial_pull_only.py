@@ -128,7 +128,6 @@ class ExportServiceInitialPullOnly:
             if not os.path.exists(parent_path):
                 os.mkdir(parent_path)
 
-
             attachment_manifest_path = os.path.join(parent_path, 'all_attachments.txt')
             if not os.path.exists(attachment_manifest_path):
                 open(attachment_manifest_path, 'w')
@@ -139,9 +138,30 @@ class ExportServiceInitialPullOnly:
                 self.logger.info(f"Processing sheet {idx + 1} of {len(sheets_list)}: sheetName={sheet['name']}, sheetId={sheet['id']}, ownerEmail={sheet['owner_email']}")
                 print(f"Processing sheet {idx + 1} of {len(sheets_list)}: : sheetName={sheet['name']}, sheetId={sheet['id']}, ownerEmail={sheet['owner_email']}")
 
-                sheet_folder_name = f"{sheet['id']} - {sheet['owner_email']} - {sheet['name']}"
+                owner = sheet['owner_email']
+                owner_folder_name = self.replace_symbol(owner)
+                owner_folder_path = os.path.join(parent_path, owner_folder_name)
+                if not os.path.exists(owner_folder_path):
+                    os.mkdir(owner_folder_path)
+
+                sheet_folder_name = f"{sheet['id']} - {sheet['name']}"
                 sheet_folder_name = self.replace_symbol(sheet_folder_name)
-                sheet_folder_path = os.path.join(parent_path, sheet_folder_name)
+                sheet_folder_path = os.path.join(owner_folder_path, sheet_folder_name)
+                alternate_sheet_folder_path = os.path.join(owner_folder_path, sheet['id'])
+                if not os.path.exists(sheet_folder_path):
+                    try:
+                        os.mkdir(sheet_folder_path)
+                    except Exception as e1:
+                        try:
+                            if not os.path.exists(alternate_sheet_folder_path):
+                                os.mkdir(alternate_sheet_folder_path)
+                            sheet_folder_path = alternate_sheet_folder_path
+                        except Exception as e2:
+                            print(
+                                f"There was a problem creating a sheet folder for sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e2}")
+                            self.logger.error(
+                                f"There was a problem creating a sheet folder for sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e2}")
+                            continue
 
                 # Process any attachments
                 try:
@@ -149,28 +169,14 @@ class ExportServiceInitialPullOnly:
                     attachments = smar_helper.list_attachments(config.SMARTSHEET_ACCESS_TOKEN, sheet['id'], sheet['owner_email'])
                     json_attachments = json.loads(attachments.to_json())
                     if 'data' in json_attachments and len(json_attachments['data']) > 0:
-                        # Create a folder for the sheet being processed
-                        try:
-                            self.logger.info(f"Creating folder for sheet '{sheet['name']}' (sheetId: {sheet['id']})")
-                            sheet_folder_exists = os.path.exists(sheet_folder_path)
-                            if sheet_folder_exists:
-                                self.logger.info(f"Folder for sheet '{sheet['name']}' (sheetId: {sheet['id']}) already exists")
-                            else:
-                                os.mkdir(sheet_folder_path)
-                        except Exception as e:
-                            print(f"There was a problem creating a sheet folder for sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}")
-                            self.logger.error(
-                                f"There was a problem creating a sheet folder for sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}")
-                            continue
-
                         attachment_folder_path = os.path.join(sheet_folder_path, 'attachments')
                         if not os.path.exists(attachment_folder_path):
                             os.mkdir(attachment_folder_path)
 
-                        if not os.path.exists(attachment_folder_path) or not self.test_filepath_validity(attachment_folder_path):  # Check again in case of race condition
-                            time.sleep(0.500)  # Is it a race condition? Let's wait a bit and check again
-                            if not os.path.exists(attachment_folder_path):
-                                os.mkdir(attachment_folder_path)
+                        # if not os.path.exists(attachment_folder_path) or not self.test_filepath_validity(attachment_folder_path):  # Check again in case of race condition
+                        #     time.sleep(0.500)  # Is it a race condition? Let's wait a bit and check again
+                        #     if not os.path.exists(attachment_folder_path):
+                        #         os.mkdir(attachment_folder_path)
 
                         attachment_list_file_path = os.path.join(sheet_folder_path, 'attachments.txt')
                         if not os.path.exists(attachment_list_file_path):
@@ -178,8 +184,8 @@ class ExportServiceInitialPullOnly:
 
                         for file in json_attachments['data']:
                             if file['attachmentType'] == 'FILE':
-                                print(f"Processing attachment {file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']})")
-                                self.logger.info(f"Processing attachment {file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']})")
+                                print(f"Processing attachment {file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}'")
+                                self.logger.info(f"Processing attachment {file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}'")
                                 try:
                                     attachment_details = smar_helper.get_attachment(config.SMARTSHEET_ACCESS_TOKEN, sheet['id'], file['id'], sheet['owner_email'])
                                     if 'createdAt' in file:
@@ -203,72 +209,85 @@ class ExportServiceInitialPullOnly:
                                         file_id = None
 
                                     if 'name' in file:
-                                        file_name = file['name']
+                                        file_name = self.replace_symbol(file['name'])
                                     else:
                                         file_name = None
 
-                                    file_description_text = f"{file_name} - {file_created_by_name} - {file_created_by_email} - {file_created_at} - {file_id}\n"
+                                    file_description_text = f"{file_id} - {file_name} - {file_created_by_name} - {file_created_by_email} - {file_created_at}\n"
                                     file_description_text = self.replace_symbol(file_description_text)
-                                    attachment_file_update = open(attachment_list_file_path, "r+") # open with read/write access, starting at beginning
-                                    content = attachment_file_update.read()
-                                    if file_description_text not in content or file_description_text not in attachment_manifest_file_content: # check if attachment is already logged; if not, download it and log it
-                                        self.logger.info(f"Downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']})")
-                                        print(f"Downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']})")
-                                        adjusted_file_name = self.replace_symbol(file_name)
-                                        attachment_download_filepath = os.path.join(attachment_folder_path, adjusted_file_name)
-                                        if not self.test_filepath_validity(attachment_download_filepath):
-                                            file_extension = os.path.splitext(adjusted_file_name)[1]
-                                            adjusted_file_name = f"{file_id}{file_extension}"
-                                            self.logger.warning(f"Adjusting filename '{file_name}' to '{adjusted_file_name}' due to invalid characters")
+                                    with open(attachment_list_file_path, "r+") as attachment_file_update:  # open with read/write access, starting at beginning
+                                        content = attachment_file_update.read()
+                                        if file_description_text not in content or file_description_text not in attachment_manifest_file_content:  # check if attachment is already logged; if not, download it and log it
+                                            self.logger.info(f"Downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}'")
+                                            file_extension = os.path.splitext(file_name)[1]
+                                            alternate_file_name = f"{file_id}{file_extension}"
 
-                                        try:
-                                            smar_helper.download_attachment(config.SMARTSHEET_ACCESS_TOKEN,
-                                                                            attachment_details,
-                                                                            attachment_folder_path,
-                                                                            sheet['owner_email'],
-                                                                            adjusted_file_name,
-                                                                            logger=self.logger,
-                                                                            root_path=parent_path)
-                                        except Exception as e:
-                                            print(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}. Trying again.")
-                                            self.logger.warning(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}. Trying again.")
-                                            time.sleep(1)
-                                            smar_helper.download_attachment(config.SMARTSHEET_ACCESS_TOKEN,
-                                                                            attachment_details,
-                                                                            attachment_folder_path,
-                                                                            sheet['owner_email'],
-                                                                            adjusted_file_name,
-                                                                            logger=self.logger,
-                                                                            root_path=parent_path)
-                                        attachment_file_update.write(file_description_text)
+                                            try:
+                                                smar_helper.download_attachment(config.SMARTSHEET_ACCESS_TOKEN,
+                                                                                attachment_details,
+                                                                                attachment_folder_path,
+                                                                                sheet['owner_email'],
+                                                                                file_name,
+                                                                                alternate_file_name=alternate_file_name,
+                                                                                logger=self.logger)
+                                                attachment_file_update.write(file_description_text)
+                                                attachment_manifest_file_update = open(attachment_manifest_path, 'a')
+                                                attachment_manifest_file_update.write(file_description_text)
+                                                attachment_manifest_file_update.close()
+                                            except Exception as e:
+                                                print(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}. Trying again.")
+                                                self.logger.warning(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}. Trying again.")
+                                                time.sleep(1)
 
-                                        attachment_manifest_file_update = open(attachment_manifest_path, 'a')
-                                        attachment_manifest_file_update.write(file_description_text)
-                                        attachment_manifest_file_update.close()
-                                    else:
-                                        self.logger.info(f"Already downloaded attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']})")
-                                        print(f"Already downloaded attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']})")
+                                                attachment_file_update.close()
 
-                                    attachment_file_update.close()
+                                                if not os.path.exists(alternate_sheet_folder_path):
+                                                    os.mkdir(alternate_sheet_folder_path)
+
+                                                alternate_attachment_folder_path = os.path.join(alternate_sheet_folder_path, 'attachments')
+                                                if not os.path.exists(alternate_attachment_folder_path):
+                                                    os.mkdir(attachment_folder_path)
+
+                                                attachment_list_file_path = os.path.join(alternate_sheet_folder_path, 'attachments.txt')
+                                                if not os.path.exists(attachment_list_file_path):
+                                                    open(attachment_list_file_path, 'w')
+
+                                                with open(attachment_list_file_path, "r+") as alternate_attachment_file_update:  # open with read/write access, starting at beginning
+                                                    content = alternate_attachment_file_update.read()
+                                                    if file_description_text not in content or file_description_text not in attachment_manifest_file_content:
+                                                        smar_helper.download_attachment(config.SMARTSHEET_ACCESS_TOKEN,
+                                                                                        attachment_details,
+                                                                                        alternate_attachment_folder_path,
+                                                                                        sheet['owner_email'],
+                                                                                        file_name,
+                                                                                        alternate_file_name=alternate_file_name,
+                                                                                        logger=self.logger)
+                                                        alternate_attachment_file_update.write(file_description_text)
+                                                        attachment_manifest_file_update = open(attachment_manifest_path, 'a')
+                                                        attachment_manifest_file_update.write(file_description_text)
+                                                        attachment_manifest_file_update.close()
+                                        else:
+                                            self.logger.info(f"Already downloaded attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}'")
+                                            print(f"Already downloaded attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}'")
+
                                     if delete_attachments:
                                         smar_helper.delete_attachment(config.SMARTSHEET_ACCESS_TOKEN,
                                                                       file_id, sheet['id'], sheet['owner_email'])
                                 except Exception as e:
-                                    print(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}")
-                                    self.logger.exception(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}", stack_info=True)
+                                    print(f"Failed to download attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}': {e}")
+                                    self.logger.exception(f"Failed to download attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}': {e}", stack_info=True)
                                     continue
                     else:
-                        self.logger.info(f"There are no attachments for sheet '{sheet['name']}' (sheetId: {sheet['id']})")
+                        self.logger.info(f"There are no attachments for sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}'")
                 except Exception as e:
-                    self.logger.error(f"There was a problem processing attachments from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}")
+                    self.logger.error(f"There was a problem processing attachments from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}': {e}")
                     continue
         except Exception as e:
             self.logger.error(f"There was an error in the process: {e}")
             print(f"There was an error in the process: {e}")
 
     def replace_symbol(self, filepath):
-        filepath = pathvalidate.sanitize_filename(filepath)
-        filepath = re.sub(r'[^\x00-\x7f]', r' ', filepath)
+        filepath = re.sub(r'[^\x00-\x7f]', r'_', filepath)
         for symbol in ['<',
                        '>',
                        ':',
@@ -313,6 +332,7 @@ class ExportServiceInitialPullOnly:
                        '\x00']:
             if symbol in filepath:
                 filepath = filepath.replace(symbol, '_')
+            filepath = pathvalidate.sanitize_filename(filepath, platform='Windows')
         return filepath
 
     def test_filepath_validity(self, filepath):
