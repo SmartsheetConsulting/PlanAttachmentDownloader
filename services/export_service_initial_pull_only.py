@@ -7,6 +7,8 @@ import json
 import requests
 import time
 import re
+import csv
+import pathvalidate as pathvalidate
 import config.config as config
 
 
@@ -121,123 +123,208 @@ class ExportServiceInitialPullOnly:
             if not os.path.exists(parent_path):
                 os.mkdir(parent_path)
 
-
-            attachment_manifest_path = os.path.join(parent_path, 'all_attachments.txt')
+            attachment_manifest_path = os.path.join(parent_path, 'all_attachments.csv')
             if not os.path.exists(attachment_manifest_path):
-                open(attachment_manifest_path, 'w')
+                with open(attachment_manifest_path, 'w', newline='') as attachment_manifest_file:
+                    manifest_csvwriter = csv.writer(attachment_manifest_file, delimiter=',')
+                    manifest_csvwriter.writerow(['Attachment ID', 'Attachment Name', 'Created By', 'Created By Email', 'Created At', 'Sheet ID', 'Sheet Name', 'Owner Email', 'Folder Path'])
 
-            attachment_manifest_file_content = open(attachment_manifest_path, 'r').read()
+            with open(attachment_manifest_path, 'a', newline='') as attachment_manifest_file:
+                manifest_csvwriter = csv.writer(attachment_manifest_file, delimiter=',')
+                for idx, sheet in enumerate(sheets_list):
+                    self.logger.info(f"Processing sheet {idx + 1} of {len(sheets_list)}: sheetName={sheet['name']}, sheetId={sheet['id']}, ownerEmail={sheet['owner_email']}")
+                    print(f"Processing sheet {idx + 1} of {len(sheets_list)}: : sheetName={sheet['name']}, sheetId={sheet['id']}, ownerEmail={sheet['owner_email']}")
 
-            for idx, sheet in enumerate(sheets_list):
-                self.logger.info(f"Processing sheet {idx + 1} of {len(sheets_list)}: sheetName={sheet['name']}, sheetId={sheet['id']}, ownerEmail={sheet['owner_email']}")
-                print(f"Processing sheet {idx + 1} of {len(sheets_list)}: : sheetName={sheet['name']}, sheetId={sheet['id']}, ownerEmail={sheet['owner_email']}")
+                    owner = sheet['owner_email']
+                    owner_folder_name = self.replace_symbol(owner)
+                    owner_folder_path = os.path.join(parent_path, owner_folder_name)
+                    if not os.path.exists(owner_folder_path):
+                        os.mkdir(owner_folder_path)
 
-                sheet_folder_name = f"{sheet['id']} - {sheet['owner_email']} - {sheet['name']}"
-                sheet_folder_name = self.replace_symbol(sheet_folder_name)
-                sheet_folder_path = os.path.join(parent_path, sheet_folder_name)
-
-                # Process any attachments
-                try:
-                    self.logger.info(f"Processing attachments for sheet '{sheet['name']}' (sheetId: {sheet['id']})")
-                    attachments = smar_helper.list_attachments(config.SMARTSHEET_ACCESS_TOKEN, sheet['id'], sheet['owner_email'])
-                    json_attachments = json.loads(attachments.to_json())
-                    if 'data' in json_attachments and len(json_attachments['data']) > 0:
-                        # Create a folder for the sheet being processed
+                    sheet_folder_name = f"{sheet['id']} - {sheet['name']}"
+                    sheet_folder_name = self.replace_symbol(sheet_folder_name)
+                    sheet_folder_path = os.path.join(owner_folder_path, sheet_folder_name)
+                    alternate_sheet_folder_name = f"{sheet['id']}"
+                    alternate_sheet_folder_path = os.path.join(owner_folder_path, alternate_sheet_folder_name)
+                    if not os.path.exists(sheet_folder_path):
                         try:
-                            self.logger.info(f"Creating folder for sheet '{sheet['name']}' (sheetId: {sheet['id']})")
-                            sheet_folder_exists = os.path.exists(sheet_folder_path)
-                            if sheet_folder_exists:
-                                self.logger.info(f"Folder for sheet '{sheet['name']}' (sheetId: {sheet['id']}) already exists")
-                            else:
-                                os.mkdir(sheet_folder_path)
-                        except Exception as e:
-                            print(f"There was a problem creating a sheet folder for sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}")
-                            self.logger.error(
-                                f"There was a problem creating a sheet folder for sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}")
-                            continue
+                            os.mkdir(sheet_folder_path)
+                        except Exception as e1:
+                            try:
+                                if not os.path.exists(alternate_sheet_folder_path):
+                                    os.mkdir(alternate_sheet_folder_path)
+                                sheet_folder_path = alternate_sheet_folder_path
+                            except Exception as e2:
+                                print(
+                                    f"There was a problem creating a sheet folder for sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e2}")
+                                self.logger.error(
+                                    f"There was a problem creating a sheet folder for sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e2}")
+                                continue
 
-                        attachment_folder_path = os.path.join(sheet_folder_path, 'attachments')
-                        if not os.path.exists(attachment_folder_path):
-                            os.mkdir(attachment_folder_path)
+                    sheet_folder_manifest_file_path = os.path.join(owner_folder_path, 'sheet_folder_manifest.csv')
+                    if not os.path.exists(sheet_folder_manifest_file_path):
+                        with open(sheet_folder_manifest_file_path, 'w', newline='') as sheet_folder_manifest_file:
+                            csvwriter = csv.writer(sheet_folder_manifest_file, delimiter=',')
+                            csvwriter.writerow(['Sheet ID', 'Sheet Name', 'Owner Email', 'Folder Name', 'Alternate Folder Name'])
 
-                        if not os.path.exists(attachment_folder_path) or not self.test_filepath_validity(attachment_folder_path):
-                            time.sleep(0.500)  # Is it a race condition? Let's wait a bit and check again
+                    with open(sheet_folder_manifest_file_path, 'a', newline='') as sheet_folder_manifest_file:
+                        csvwriter = csv.writer(sheet_folder_manifest_file, delimiter=',')
+                        csvwriter.writerow([f"{sheet['id']}", sheet['name'], sheet['owner_email'], sheet_folder_name, alternate_sheet_folder_name])
+
+                    # Process any attachments
+                    try:
+                        self.logger.info(f"Processing attachments for sheet '{sheet['name']}' (sheetId: {sheet['id']})")
+                        attachments = smar_helper.list_attachments(config.SMARTSHEET_ACCESS_TOKEN, sheet['id'], sheet['owner_email'])
+                        json_attachments = json.loads(attachments.to_json())
+                        if 'data' in json_attachments and len(json_attachments['data']) > 0:
+                            attachment_folder_path = os.path.join(sheet_folder_path, 'attachments')
                             if not os.path.exists(attachment_folder_path):
                                 os.mkdir(attachment_folder_path)
 
-                        attachment_list_file_path = os.path.join(sheet_folder_path, 'attachments.txt')
-                        if not os.path.exists(attachment_list_file_path):
-                            open(attachment_list_file_path, 'w')
+                            attachment_list_file_path = os.path.join(sheet_folder_path, 'attachments.csv')
+                            if not os.path.exists(attachment_list_file_path):
+                                with open(attachment_list_file_path, 'w', newline='') as attachment_list_file:
+                                    csvwriter = csv.writer(attachment_list_file, delimiter=',')
+                                    csvwriter.writerow(['Attachment ID', 'Attachment Name', 'Created By', 'Created By Email', 'Created At'])
 
-                        for file in json_attachments['data']:
-                            if file['attachmentType'] == 'FILE':
-                                print(f"Processing attachment {file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']})")
-                                self.logger.info(f"Processing attachment {file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']})")
-                                try:
-                                    attachment_details = smar_helper.get_attachment(config.SMARTSHEET_ACCESS_TOKEN, sheet['id'], file['id'], sheet['owner_email'])
-                                    if 'createdAt' in file:
-                                        file_created_at = file['createdAt']
-                                    else:
-                                        file_created_at = None
+                            for file in json_attachments['data']:
+                                if file['attachmentType'] == 'FILE':
+                                    print(f"Processing attachment {file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}'")
+                                    self.logger.info(f"Processing attachment {file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}'")
+                                    try:
+                                        attachment_details = smar_helper.get_attachment(config.SMARTSHEET_ACCESS_TOKEN, sheet['id'], file['id'], sheet['owner_email'])
+                                        if 'createdAt' in file:
+                                            file_created_at = file['createdAt']
+                                        else:
+                                            file_created_at = None
 
-                                    if 'createdBy' in file and 'name' in file['createdBy']:
-                                        file_created_by_name = file['createdBy']['name']
-                                    else:
-                                        file_created_by_name = None
+                                        if 'createdBy' in file and 'name' in file['createdBy']:
+                                            file_created_by_name = file['createdBy']['name']
+                                        else:
+                                            file_created_by_name = None
 
-                                    if 'createdBy' in file and 'email' in file['createdBy']:
-                                        file_created_by_email = file['createdBy']['email']
-                                    else:
-                                        file_created_by_email = None
+                                        if 'createdBy' in file and 'email' in file['createdBy']:
+                                            file_created_by_email = file['createdBy']['email']
+                                        else:
+                                            file_created_by_email = None
 
-                                    if 'id' in file:
-                                        file_id = file['id']
-                                    else:
-                                        file_id = None
+                                        if 'id' in file:
+                                            file_id = file['id']
+                                        else:
+                                            file_id = None
 
-                                    if 'name' in file:
-                                        file_name = file['name']
-                                    else:
-                                        file_name = None
+                                        if 'name' in file:
+                                            file_name = self.replace_symbol(file['name'])
+                                        else:
+                                            file_name = None
 
-                                    file_description_text = f"{file_name} - {file_created_by_name} - {file_created_by_email} - {file_created_at} - {file_id}\n"
-                                    file_description_text = self.replace_symbol(file_description_text)
-                                    attachment_file_update = open(attachment_list_file_path, "r+") # open with read/write access, starting at beginning
-                                    content = attachment_file_update.read()
-                                    if file_description_text not in content or file_description_text not in attachment_manifest_file_content: # check if attachment is already logged; if not, download it and log it
-                                        adjusted_file_name = self.replace_symbol(file_name)
-                                        attachment_download_filepath = os.path.join(attachment_folder_path, adjusted_file_name)
-                                        if not self.test_filepath_validity(attachment_download_filepath):
-                                            file_extension = os.path.splitext(adjusted_file_name)[1]
-                                            adjusted_file_name = f"{file_id}{file_extension}"
-                                            self.logger.warning(f"Adjusting filename '{file_name}' to '{adjusted_file_name}' due to invalid characters")
+                                        attachment_list_reader = csv.reader(open(attachment_list_file_path, 'r'))
+                                        attachment_logged = False
+                                        for row in attachment_list_reader:
+                                            if row[0] == f"{file_id}":
+                                                attachment_logged = True
+                                                break
 
-                                        smar_helper.download_attachment(config.SMARTSHEET_ACCESS_TOKEN, attachment_details, attachment_folder_path, sheet['owner_email'], adjusted_file_name)
-                                        attachment_file_update.write(file_description_text)
+                                        if attachment_logged:
+                                            self.logger.info(
+                                                f"Already downloaded attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}'")
+                                            print(
+                                                f"Already downloaded attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}")
+                                            continue
+                                        else:
+                                            with open(attachment_list_file_path, "a", newline='') as attachment_file_update:  # open with read/write access, starting at beginning check if attachment is already logged; if not, download it and log it
+                                                self.logger.info(f"Downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}'")
+                                                file_extension = os.path.splitext(file_name)[1]
+                                                alternate_file_name = f"{file_id}{file_extension}"
+                                                attachment_csv_writer = csv.writer(attachment_file_update, delimiter=',')
+                                                retry_allowance = 1
+                                                success = False
+                                                while retry_allowance >= 0 and not success:
+                                                    try:
+                                                        smar_helper.download_attachment(config.SMARTSHEET_ACCESS_TOKEN,
+                                                                                        attachment_details,
+                                                                                        attachment_folder_path,
+                                                                                        sheet['owner_email'],
+                                                                                        file_name,
+                                                                                        alternate_file_name=alternate_file_name,
+                                                                                        logger=self.logger)
+                                                        attachment_csv_writer.writerow([f"{file_id}", file_name, file_created_by_name, file_created_by_email, file_created_at])
+                                                        manifest_csvwriter.writerow([f"{file_id}", file_name, file_created_by_name, file_created_by_email, file_created_at, f"{sheet['id']}", sheet['name'], sheet['owner_email'], attachment_folder_path])
+                                                        success = True
+                                                    except FileNotFoundError as file_not_found_error:
+                                                        print(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {file_not_found_error}. Trying again.")
+                                                        self.logger.warning(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {file_not_found_error}. Trying again.")
+                                                        time.sleep(1)
 
-                                        attachment_manifest_file_update = open(attachment_manifest_path, 'a')
-                                        attachment_manifest_file_update.write(file_description_text)
-                                        attachment_manifest_file_update.close()
+                                                        attachment_file_update.close()
 
-                                    attachment_file_update.close()
-                                    if delete_attachments:
-                                        smar_helper.delete_attachment(config.SMARTSHEET_ACCESS_TOKEN,
-                                                                      file_id, sheet['id'], sheet['owner_email'])
-                                except Exception as e:
-                                    print(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}")
-                                    self.logger.error(f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}")
-                                    continue
-                    else:
-                        self.logger.info(f"There are no attachments for sheet '{sheet['name']}' (sheetId: {sheet['id']})")
-                except Exception as e:
-                    self.logger.error(f"There was a problem processing attachments from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}")
-                    continue
+                                                        if not os.path.exists(alternate_sheet_folder_path):
+                                                            os.mkdir(alternate_sheet_folder_path)
+
+                                                        alternate_attachment_folder_path = os.path.join(alternate_sheet_folder_path, 'attachments')
+                                                        if not os.path.exists(alternate_attachment_folder_path):
+                                                            os.mkdir(alternate_attachment_folder_path)
+
+                                                        attachment_list_file_path = os.path.join(alternate_sheet_folder_path, 'attachments.csv')
+                                                        if not os.path.exists(attachment_list_file_path):
+                                                            with open(attachment_list_file_path, 'w', newline='') as attachment_list_file:
+                                                                csvwriter = csv.writer(attachment_list_file, delimiter=',')
+                                                                csvwriter.writerow(['Attachment ID', 'Attachment Name', 'Created By','Created By Email', 'Created At'])
+
+                                                        alternate_reader = csv.reader(open(attachment_list_file_path, 'r'))
+                                                        attachment_logged = False
+                                                        for row in alternate_reader:
+                                                            if row[0] == f"{file_id}":
+                                                                attachment_logged = True
+                                                                break
+
+                                                        if attachment_logged:
+                                                            self.logger.info(
+                                                                f"Already downloaded attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}'")
+                                                            print(
+                                                                f"Already downloaded attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}")
+                                                            continue
+                                                        else:
+                                                            with open(attachment_list_file_path, "a", newline='') as alternate_attachment_file_update:
+                                                                alternate_attachment_csv_writer = csv.writer(alternate_attachment_file_update, delimiter=',')# open with read/write access, starting at beginning
+                                                                smar_helper.download_attachment(config.SMARTSHEET_ACCESS_TOKEN,
+                                                                                                attachment_details,
+                                                                                                alternate_attachment_folder_path,
+                                                                                                sheet['owner_email'],
+                                                                                                file_name,
+                                                                                                alternate_file_name=alternate_file_name,
+                                                                                                logger=self.logger)
+                                                                alternate_attachment_csv_writer.writerow([f"{file_id}", file_name, file_created_by_name, file_created_by_email, file_created_at])
+                                                                manifest_csvwriter.writerow([f"{file_id}", file_name, file_created_by_name, file_created_by_email, file_created_at, f"{sheet['id']}", sheet['name'], sheet['owner_email'], alternate_attachment_folder_path])
+                                                                success = True
+                                                    except Exception as e:
+                                                        retry_allowance -= 1
+                                                        if retry_allowance >= 0:
+                                                            print(
+                                                                f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}. Trying again.")
+                                                            self.logger.warning(
+                                                                f"There was a problem downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}): {e}. Trying again.")
+                                                            time.sleep(1)
+                                                        else:
+                                                            raise e
+
+                                        if delete_attachments:
+                                            smar_helper.delete_attachment(config.SMARTSHEET_ACCESS_TOKEN, file_id, sheet['id'], sheet['owner_email'])
+                                    except Exception as e:
+                                        self.logger.error(f"There was a problem processing attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}': {e}")
+                                        print(f"There was a problem processing attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}': {e}")
+                                        continue
+                        else:
+                            self.logger.info(f"There are no attachments for sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}'")
+                    except Exception as e:
+                        self.logger.error(f"There was a problem processing attachments from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}': {e}")
+                        continue
         except Exception as e:
             self.logger.error(f"There was an error in the process: {e}")
             print(f"There was an error in the process: {e}")
 
     def replace_symbol(self, filepath):
-        filepath = re.sub(r'[^\x00-\x7f]', r' ', filepath)
+        filepath = re.sub(r'[^\x00-\x7f]', r'_', filepath)
         for symbol in ['<',
                        '>',
                        ':',
@@ -247,6 +334,8 @@ class ExportServiceInitialPullOnly:
                        '|',
                        '?',
                        '*',
+                       '$',
+                       ',',
                        '\u00a0',
                        '\u1680',
                        '\u180e',
@@ -281,6 +370,7 @@ class ExportServiceInitialPullOnly:
                        '\x00']:
             if symbol in filepath:
                 filepath = filepath.replace(symbol, '_')
+            filepath = pathvalidate.sanitize_filename(filepath, platform='Windows')
         return filepath
 
     def test_filepath_validity(self, filepath):
