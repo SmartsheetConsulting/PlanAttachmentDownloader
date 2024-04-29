@@ -38,8 +38,8 @@ def download_attachment(access_token, attachment, path, email, file_name, altern
         if not os.path.exists(path):
             os.makedirs(path)
         try:
-            with open(download_path, "wb") as dlfile:
-                logger.info(f"Successfully opened file for writing")
+            with open(download_path, "wb", encoding='utf-8') as dlfile:
+                logger.info(f"Successfully opened file for writing", encoding='utf-8')
                 with contextlib.closing(resp):
                     for chunk in resp.iter_content(2**16):
                         dlfile.write(chunk)
@@ -47,8 +47,8 @@ def download_attachment(access_token, attachment, path, email, file_name, altern
             download_path = os.path.join(path, alternate_file_name)
             logger.exception(f"Error: {e1}. Attempting to rename file and download again: {download_path}",
                              stack_info=True)
-            with open(download_path, "wb") as dlfile:
-                logger.info(f"Successfully opened file for writing with sanitized file name.")
+            with open(download_path, "wb", encoding='utf-8') as dlfile:
+                logger.info(f"Successfully opened file for writing with sanitized file name.", encoding='utf-8')
                 with contextlib.closing(resp):
                     for chunk in resp.iter_content(2 ** 16):
                         dlfile.write(chunk)
