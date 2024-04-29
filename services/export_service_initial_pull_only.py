@@ -125,11 +125,11 @@ class ExportServiceInitialPullOnly:
 
             attachment_manifest_path = os.path.join(parent_path, 'all_attachments.csv')
             if not os.path.exists(attachment_manifest_path):
-                with open(attachment_manifest_path, 'w', newline='') as attachment_manifest_file:
+                with open(attachment_manifest_path, 'w', newline='', encoding='utf-8') as attachment_manifest_file:
                     manifest_csvwriter = csv.writer(attachment_manifest_file, delimiter=',')
                     manifest_csvwriter.writerow(['Attachment ID', 'Attachment Name', 'Created By', 'Created By Email', 'Created At', 'Sheet ID', 'Sheet Name', 'Owner Email', 'Folder Path'])
 
-            with open(attachment_manifest_path, 'a', newline='') as attachment_manifest_file:
+            with open(attachment_manifest_path, 'a', newline='', encoding='utf-8') as attachment_manifest_file:
                 manifest_csvwriter = csv.writer(attachment_manifest_file, delimiter=',')
                 for idx, sheet in enumerate(sheets_list):
                     self.logger.info(f"Processing sheet {idx + 1} of {len(sheets_list)}: sheetName={sheet['name']}, sheetId={sheet['id']}, ownerEmail={sheet['owner_email']}")
@@ -163,11 +163,11 @@ class ExportServiceInitialPullOnly:
 
                     sheet_folder_manifest_file_path = os.path.join(owner_folder_path, 'sheet_folder_manifest.csv')
                     if not os.path.exists(sheet_folder_manifest_file_path):
-                        with open(sheet_folder_manifest_file_path, 'w', newline='') as sheet_folder_manifest_file:
+                        with open(sheet_folder_manifest_file_path, 'w', newline='', encoding='utf-8') as sheet_folder_manifest_file:
                             csvwriter = csv.writer(sheet_folder_manifest_file, delimiter=',')
                             csvwriter.writerow(['Sheet ID', 'Sheet Name', 'Owner Email', 'Folder Name', 'Alternate Folder Name'])
 
-                    with open(sheet_folder_manifest_file_path, 'a', newline='') as sheet_folder_manifest_file:
+                    with open(sheet_folder_manifest_file_path, 'a', newline='', encoding='utf-8') as sheet_folder_manifest_file:
                         csvwriter = csv.writer(sheet_folder_manifest_file, delimiter=',')
                         csvwriter.writerow([f"{sheet['id']}", sheet['name'], sheet['owner_email'], sheet_folder_name, alternate_sheet_folder_name])
 
@@ -183,7 +183,7 @@ class ExportServiceInitialPullOnly:
 
                             attachment_list_file_path = os.path.join(sheet_folder_path, 'attachments.csv')
                             if not os.path.exists(attachment_list_file_path):
-                                with open(attachment_list_file_path, 'w', newline='') as attachment_list_file:
+                                with open(attachment_list_file_path, 'w', newline='', encoding='utf-8') as attachment_list_file:
                                     csvwriter = csv.writer(attachment_list_file, delimiter=',')
                                     csvwriter.writerow(['Attachment ID', 'Attachment Name', 'Created By', 'Created By Email', 'Created At'])
 
@@ -218,7 +218,7 @@ class ExportServiceInitialPullOnly:
                                         else:
                                             file_name = None
 
-                                        attachment_list_reader = csv.reader(open(attachment_list_file_path, 'r'))
+                                        attachment_list_reader = csv.reader(open(attachment_list_file_path, 'r', encoding='utf-8'))
                                         attachment_logged = False
                                         for row in attachment_list_reader:
                                             if row[0] == f"{file_id}":
@@ -232,7 +232,7 @@ class ExportServiceInitialPullOnly:
                                                 f"Already downloaded attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}")
                                             continue
                                         else:
-                                            with open(attachment_list_file_path, "a", newline='') as attachment_file_update:  # open with read/write access, starting at beginning check if attachment is already logged; if not, download it and log it
+                                            with open(attachment_list_file_path, "a", newline='', encoding='utf-8') as attachment_file_update:  # open with read/write access, starting at beginning check if attachment is already logged; if not, download it and log it
                                                 self.logger.info(f"Downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}'")
                                                 file_extension = os.path.splitext(file_name)[1]
                                                 alternate_file_name = f"{file_id}{file_extension}"
@@ -267,11 +267,11 @@ class ExportServiceInitialPullOnly:
 
                                                         attachment_list_file_path = os.path.join(alternate_sheet_folder_path, 'attachments.csv')
                                                         if not os.path.exists(attachment_list_file_path):
-                                                            with open(attachment_list_file_path, 'w', newline='') as attachment_list_file:
+                                                            with open(attachment_list_file_path, 'w', newline='', encoding='utf-8') as attachment_list_file:
                                                                 csvwriter = csv.writer(attachment_list_file, delimiter=',')
                                                                 csvwriter.writerow(['Attachment ID', 'Attachment Name', 'Created By','Created By Email', 'Created At'])
 
-                                                        alternate_reader = csv.reader(open(attachment_list_file_path, 'r'))
+                                                        alternate_reader = csv.reader(open(attachment_list_file_path, 'r', encoding='utf-8'))
                                                         attachment_logged = False
                                                         for row in alternate_reader:
                                                             if row[0] == f"{file_id}":
@@ -285,7 +285,7 @@ class ExportServiceInitialPullOnly:
                                                                 f"Already downloaded attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}")
                                                             continue
                                                         else:
-                                                            with open(attachment_list_file_path, "a", newline='') as alternate_attachment_file_update:
+                                                            with open(attachment_list_file_path, "a", newline='', encoding='utf-8') as alternate_attachment_file_update:
                                                                 alternate_attachment_csv_writer = csv.writer(alternate_attachment_file_update, delimiter=',')# open with read/write access, starting at beginning
                                                                 smar_helper.download_attachment(config.SMARTSHEET_ACCESS_TOKEN,
                                                                                                 attachment_details,
