@@ -49,7 +49,7 @@ class ExportServiceInitialPullOnly:
         return logger
 
     def download_attachments(self, delete_attachments=False):
-        self.logger.info("Beginning initial data pull")
+        self.logger.info("Beginning test cases")
 
         user_list = []
         sheets_list = []
@@ -64,7 +64,7 @@ class ExportServiceInitialPullOnly:
                 'Authorization': f"Bearer {config.SMARTSHEET_ACCESS_TOKEN}"
             }
 
-            user_list = [{"email": "jason.moy@exxonmobile.com"}]
+            user_list = [{"email": "anna.kovacs@exxonmobil.com", "email": "angelica.l.parragaariza@exxonmobil.com", "email": "david.roman1@exxonmobil.com", "email": "fernando.lara@exxonmobil.com"}]
 
             # try:
             #     page = 1
@@ -122,7 +122,7 @@ class ExportServiceInitialPullOnly:
             self.logger.info(f"{len(sheets_list)} sheets to process")
             print(f"{len(sheets_list)} sheets to process")
 
-            parent_path = os.path.join(os.path.curdir, 'smartsheet_attachments')
+            parent_path = os.path.join(os.path.curdir, 'smartsheet_attachments_test_cases')
             if not os.path.exists(parent_path):
                 os.mkdir(parent_path)
 
