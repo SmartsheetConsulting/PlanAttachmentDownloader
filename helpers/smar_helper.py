@@ -45,8 +45,7 @@ def download_attachment(access_token, attachment, path, email, file_name, altern
                         dlfile.write(chunk)
         except Exception as e1:
             download_path = os.path.join(path, alternate_file_name)
-            logger.exception(f"Error: {e1}. Attempting to rename file and download again: {download_path}",
-                             stack_info=True)
+            logger.warning(f"Error: {e1}. Attempting to rename file and download again: {download_path}")
             with open(download_path, "wb") as dlfile:
                 logger.info(f"Successfully opened file for writing with sanitized file name.")
                 with contextlib.closing(resp):

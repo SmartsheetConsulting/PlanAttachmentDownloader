@@ -49,7 +49,7 @@ class ExportServiceInitialPullOnly:
         return logger
 
     def download_attachments(self, delete_attachments=False):
-        self.logger.info("Beginning Test Cases")
+        self.logger.info("Beginning initial data pull")
 
         user_list = []
         sheets_list = []
@@ -101,7 +101,7 @@ class ExportServiceInitialPullOnly:
                             response = requests.request("GET", url, headers=headers, data="", verify=False)
                             json_response = response.json()
                             if 'errorCode' in json_response and (json_response['errorCode'] == 5349 or json_response['errorCode'] == 1030):
-                                self.logger.error(f"User {user['email']} cannot be assumed. Error Code: {json_response['errorCode']}")
+                                self.logger.exception(f"User {user['email']} cannot be assumed. Error Code: {json_response['errorCode']}", stack_info=True)
                                 break
 
                             total_pages = json_response['totalPages']
@@ -113,16 +113,16 @@ class ExportServiceInitialPullOnly:
                                     sheets_list.append(sheet)
                             page = page + 1
                         except Exception as e:
-                            self.logger.error(f"{e}")
+                            self.logger.exception(f"{e}", stack_info=True)
                 except Exception as e:
-                    self.logger.error(f"There was a problem retrieving all org sheets: {e}")
+                    self.logger.exception(f"There was a problem retrieving all org sheets: {e}", stack_info=True)
                     print(f"There was a problem retrieving all org sheets: {e}")
                     return
 
             self.logger.info(f"{len(sheets_list)} sheets to process")
             print(f"{len(sheets_list)} sheets to process")
 
-            parent_path = os.path.join(os.path.curdir, 'smartsheet_attachments_test_cases')
+            parent_path = os.path.join(os.path.curdir, 'smartsheet_attachments')
             if not os.path.exists(parent_path):
                 os.mkdir(parent_path)
 
@@ -221,12 +221,19 @@ class ExportServiceInitialPullOnly:
                                         else:
                                             file_name = None
 
-                                        attachment_list_reader = csv.reader(open(attachment_list_file_path, 'r', encoding='utf-8'))
                                         attachment_logged = False
-                                        for row in attachment_list_reader:
-                                            if row[0] == f"{file_id}":
-                                                attachment_logged = True
-                                                break
+                                        try:
+                                            attachment_list_reader = csv.reader(open(attachment_list_file_path, 'r', encoding='utf-8'))
+                                            for row in attachment_list_reader:
+                                                if row[0] == f"{file_id}":
+                                                    attachment_logged = True
+                                                    break
+                                        except:
+                                            attachment_list_reader = csv.reader(open(attachment_list_file_path, 'r', encoding='iso8859-1'))
+                                            for row in attachment_list_reader:
+                                                if row[0] == f"{file_id}":
+                                                    attachment_logged = True
+                                                    break
 
                                         if attachment_logged:
                                             self.logger.info(
@@ -235,7 +242,7 @@ class ExportServiceInitialPullOnly:
                                                 f"Already downloaded attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}")
                                             continue
                                         else:
-                                            with open(attachment_list_file_path, "a", newline='', encoding='utf-8') as attachment_file_update:  # open with read/write access, starting at beginning check if attachment is already logged; if not, download it and log it
+                                            with open(attachment_list_file_path, "a", newline='', encoding='utf-8') as attachment_file_update:
                                                 self.logger.info(f"Downloading attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}'")
                                                 file_extension = os.path.splitext(file_name)[1]
                                                 alternate_file_name = f"{file_id}{file_extension}"
@@ -274,12 +281,20 @@ class ExportServiceInitialPullOnly:
                                                                 csvwriter = csv.writer(attachment_list_file, delimiter=',')
                                                                 csvwriter.writerow(['Attachment ID', 'Attachment Name', 'Created By','Created By Email', 'Created At'])
 
-                                                        alternate_reader = csv.reader(open(attachment_list_file_path, 'r', encoding='utf-8'))
                                                         attachment_logged = False
-                                                        for row in alternate_reader:
-                                                            if row[0] == f"{file_id}":
-                                                                attachment_logged = True
-                                                                break
+                                                        try:
+                                                            alternate_reader = csv.reader(open(attachment_list_file_path, 'r', encoding='iso8859-1'))
+                                                            for row in alternate_reader:
+                                                                if row[0] == f"{file_id}":
+                                                                    attachment_logged = True
+                                                                    break
+                                                        except:
+                                                            alternate_reader = csv.reader(
+                                                                open(attachment_list_file_path, 'r', encoding='utf-8'))
+                                                            for row in alternate_reader:
+                                                                if row[0] == f"{file_id}":
+                                                                    attachment_logged = True
+                                                                    break
 
                                                         if attachment_logged:
                                                             self.logger.info(
@@ -314,7 +329,7 @@ class ExportServiceInitialPullOnly:
                                         if delete_attachments:
                                             smar_helper.delete_attachment(config.SMARTSHEET_ACCESS_TOKEN, file_id, sheet['id'], sheet['owner_email'])
                                     except Exception as e:
-                                        self.logger.error(f"There was a problem processing attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}': {e}")
+                                        self.logger.exception(f"There was a problem processing attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}': {e}", stack_info=True)
                                         print(f"There was a problem processing attachment '{file['name']}' from sheet '{sheet['name']}' (sheetId: {sheet['id']}) for owner '{sheet['owner_email']}': {e}")
                                         continue
                         else:
