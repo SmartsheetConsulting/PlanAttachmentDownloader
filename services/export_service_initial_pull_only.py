@@ -64,7 +64,7 @@ class ExportServiceInitialPullOnly:
                 'Authorization': f"Bearer {config.SMARTSHEET_ACCESS_TOKEN}"
             }
 
-            user_list = [{"email": "anna.kovacs@exxonmobil.com", "email": "angelica.l.parragaariza@exxonmobil.com", "email": "david.roman1@exxonmobil.com", "email": "fernando.lara@exxonmobil.com"}]
+            user_list = [{"email": "anna.kovacs@exxonmobil.com"}, {"email": "angelica.l.parragaariza@exxonmobil.com"}, {"email": "david.roman1@exxonmobil.com"}, {"email": "fernando.lara@exxonmobil.com"}]
 
             # try:
             #     page = 1
