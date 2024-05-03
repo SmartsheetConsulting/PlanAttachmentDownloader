@@ -64,7 +64,8 @@ class ExportServiceInitialPullOnly:
                 'Authorization': f"Bearer {config.SMARTSHEET_ACCESS_TOKEN}"
             }
 
-            user_list = [{"email": "anna.kovacs@exxonmobil.com"}, {"email": "angelica.l.parragaariza@exxonmobil.com"}, {"email": "david.roman1@exxonmobil.com"}, {"email": "fernando.lara@exxonmobil.com"}]
+            # TODO: Test cases only; delete and uncomment below for production
+            user_list = config.TEST_CASES_USER_LIST
 
             # try:
             #     page = 1
@@ -340,6 +341,43 @@ class ExportServiceInitialPullOnly:
         except Exception as e:
             self.logger.exception(f"There was an error in the process: {e}", stack_info=True)
             print(f"There was an error in the process: {e}")
+
+    def delete_attachments(self):
+        self.logger.info("Beginning test cases - deletion")
+
+        parent_path = os.path.join(os.path.curdir, 'smartsheet_attachments_test_cases')
+        if not os.path.exists(parent_path):
+            os.mkdir(parent_path)
+
+        attachment_manifest_path = os.path.join(parent_path, 'all_attachments.csv')
+        try:
+            attachment_list_reader = csv.reader(open(attachment_manifest_path, 'r', encoding='utf-8'))
+        except:
+            attachment_list_reader = csv.reader(open(attachment_manifest_path, 'r', encoding='iso8859-1'))
+
+        for row in attachment_list_reader:
+            try:
+                attachment_id = row[0]
+                attachment_name = row[1]
+                sheet_id = row[5]
+                sheet_name = row[6]
+                sheet_owner_email = row[7]
+
+                if sheet_owner_email in config.ATTACHMENT_DELETION_USER_EXCLUSION_LIST:
+                    self.logger.info(
+                        f"Skipping attachment '{attachment_name}' ({attachment_id}) from sheet '{sheet_name}' ({sheet_id}), owned by '{sheet_owner_email}'")
+                    continue
+
+                self.logger.info(f"Deleting attachment '{attachment_name}' ({attachment_id}) from sheet '{sheet_name}' ({sheet_id}), owned by '{sheet_owner_email}'")
+                del_resp = smar_helper.delete_attachment(config.SMARTSHEET_ACCESS_TOKEN, attachment_id, sheet_id, sheet_owner_email)
+                if '_result_code' in del_resp.__dict__ and del_resp.result_code == 0:
+                    self.logger.info(f"Attachment '{attachment_name}' ({attachment_id}) deleted.")
+                elif del_resp.result.code == 1006:
+                    self.logger.info(f"Attachment '{attachment_name}' ({attachment_id}) not found or already deleted.")
+                else:
+                    self.logger.warning(f"Failed to delete attachment '{attachment_name}' ({attachment_id}): ({del_resp.result.code}) {del_resp.result.message}")
+            except Exception as e:
+                self.logger.exception(f"There was an error in the process: {e}", stack_info=True)
 
     def replace_symbol(self, filepath):
         filepath = re.sub(r'[^\x00-\x7f]', r'_', filepath)
