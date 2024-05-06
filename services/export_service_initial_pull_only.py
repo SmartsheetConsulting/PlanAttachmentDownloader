@@ -345,6 +345,8 @@ class ExportServiceInitialPullOnly:
     def delete_attachments(self):
         self.logger.info("Beginning test cases - deletion")
 
+        user_exclusion_list = [e.lower() for e in config.ATTACHMENT_DELETION_USER_EXCLUSION_LIST]
+
         parent_path = os.path.join(os.path.curdir, 'smartsheet_attachments_test_cases')
         if not os.path.exists(parent_path):
             os.mkdir(parent_path)
@@ -361,9 +363,9 @@ class ExportServiceInitialPullOnly:
                 attachment_name = row[1]
                 sheet_id = row[5]
                 sheet_name = row[6]
-                sheet_owner_email = row[7]
+                sheet_owner_email = row[7].lower()
 
-                if sheet_owner_email in config.ATTACHMENT_DELETION_USER_EXCLUSION_LIST:
+                if sheet_owner_email in user_exclusion_list:
                     self.logger.info(
                         f"Skipping attachment '{attachment_name}' ({attachment_id}) from sheet '{sheet_name}' ({sheet_id}), owned by '{sheet_owner_email}'")
                     continue
