@@ -49,7 +49,7 @@ class ExportServiceInitialPullOnly:
         return logger
 
     def download_attachments(self, delete_attachments=False):
-        self.logger.info("Beginning initial data pull")
+        self.logger.info("Beginning test cases")
 
         user_list = []
         sheets_list = []
@@ -64,25 +64,29 @@ class ExportServiceInitialPullOnly:
                 'Authorization': f"Bearer {config.SMARTSHEET_ACCESS_TOKEN}"
             }
 
-            try:
-                page = 1
-                total_pages = 1
-                while page <= total_pages:
-                    try:
-                        url = f"https://api.smartsheet.com/2.0/users?page={page}&pageSize=1000"
-                        response = requests.request("GET", url, headers=headers, data="", verify=False)
-                        json_response = response.json()
-                        total_pages = json_response['totalPages']
+            # TODO: Test cases only; delete and uncomment below for production
+            user_list = config.TEST_CASES_USER_LIST
 
-                        user_list.extend(json_response['data'])
-                        page = page + 1
-                    except Exception as e:
-                        print(f"{e}")
-                        self.logger.exception(f"{e}", stack_info=True)
-            except Exception as e:
-                self.logger.exception(f"There was a problem retrieving all users: {e}", stack_info=True)
-                print(f"There was a problem retrieving all users: {e}")
-                return
+            # try:
+            #     page = 1
+            #     total_pages = 1
+            #     while page <= total_pages:
+            #         try:
+            #             url = f"https://api.smartsheet.com/2.0/users?page={page}&pageSize=10"
+            #             response = requests.request("GET", url, headers=headers, data="", verify=False)
+            #             json_response = response.json()
+            #             total_pages = json_response['totalPages']
+            #             total_pages = 1
+            #
+            #             user_list.extend(json_response['data'])
+            #             page = page + 1
+            #         except Exception as e:
+            #             print(f"{e}")
+            #             self.logger.error(f"{e}")
+            # except Exception as e:
+            #     self.logger.error(f"There was a problem retrieving all users: {e}")
+            #     print(f"There was a problem retrieving all users: {e}")
+            #     return
 
             for idx, user in enumerate(user_list):
                 try:
@@ -119,7 +123,7 @@ class ExportServiceInitialPullOnly:
             self.logger.info(f"{len(sheets_list)} sheets to process")
             print(f"{len(sheets_list)} sheets to process")
 
-            parent_path = os.path.join(os.path.curdir, 'smartsheet_attachments')
+            parent_path = os.path.join(os.path.curdir, 'smartsheet_attachments_test_cases')
             if not os.path.exists(parent_path):
                 os.mkdir(parent_path)
 
@@ -337,6 +341,47 @@ class ExportServiceInitialPullOnly:
         except Exception as e:
             self.logger.exception(f"There was an error in the process: {e}", stack_info=True)
             print(f"There was an error in the process: {e}")
+
+    def delete_attachments(self):
+        self.logger.info("Beginning test cases - deletion")
+
+        user_exclusion_list = [e.lower() for e in config.ATTACHMENT_DELETION_USER_EXCLUSION_LIST]
+
+        parent_path = os.path.join(os.path.curdir, 'smartsheet_attachments_test_cases')
+        if not os.path.exists(parent_path):
+            os.mkdir(parent_path)
+
+        attachment_manifest_path = os.path.join(parent_path, 'all_attachments.csv')
+        try:
+            attachment_list_reader = csv.reader(open(attachment_manifest_path, 'r', encoding='utf-8'))
+        except:
+            attachment_list_reader = csv.reader(open(attachment_manifest_path, 'r', encoding='iso8859-1'))
+
+        next(attachment_list_reader, None)  # skip header row
+
+        for row in attachment_list_reader:
+            try:
+                attachment_id = row[0]
+                attachment_name = row[1]
+                sheet_id = row[5]
+                sheet_name = row[6]
+                sheet_owner_email = row[7].lower()
+
+                if sheet_owner_email in user_exclusion_list:
+                    self.logger.info(
+                        f"Skipping attachment '{attachment_name}' ({attachment_id}) from sheet '{sheet_name}' ({sheet_id}), owned by '{sheet_owner_email}'")
+                    continue
+
+                self.logger.info(f"Deleting attachment '{attachment_name}' ({attachment_id}) from sheet '{sheet_name}' ({sheet_id}), owned by '{sheet_owner_email}'")
+                del_resp = smar_helper.delete_attachment(config.SMARTSHEET_ACCESS_TOKEN, attachment_id, sheet_id, sheet_owner_email)
+                if '_result_code' in del_resp.__dict__ and del_resp.result_code == 0:
+                    self.logger.info(f"Attachment '{attachment_name}' ({attachment_id}) deleted.")
+                elif del_resp.result.code == 1006:
+                    self.logger.info(f"Attachment '{attachment_name}' ({attachment_id}) not found or already deleted.")
+                else:
+                    self.logger.warning(f"Failed to delete attachment '{attachment_name}' ({attachment_id}): ({del_resp.result.code}) {del_resp.result.message}")
+            except Exception as e:
+                self.logger.exception(f"There was an error in the process: {e}", stack_info=True)
 
     def replace_symbol(self, filepath):
         filepath = re.sub(r'[^\x00-\x7f]', r'_', filepath)
