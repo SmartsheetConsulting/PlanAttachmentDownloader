@@ -5,7 +5,7 @@ TEST_CASES_USER_LIST = [
     {"email": "angelica.l.parragaariza@exxonmobil.com"},
     {"email": "david.roman1@exxonmobil.com"},
     {"email": "fernando.lara@exxonmobil.com"},
-    {"email": "jason.moy@exxonmobile.com"},
+    {"email": "jason.moy@exxonmobil.com"},
     {"email": "aaron.m.tschirhart@esso.ca"},
     {"email": "david.evans@esso.ca"},
     {"email": "daniel.k.nomanbhoy@exxonmobil.com"}
@@ -16,7 +16,7 @@ ATTACHMENT_DELETION_USER_EXCLUSION_LIST = [
     "angelica.l.parragaariza@exxonmobil.com",
     "david.roman1@exxonmobil.com",
     "fernando.lara@exxonmobil.com",
-    "jason.moy@exxonmobile.com",
+    "jason.moy@exxonmobil.com",
     "aaron.m.tschirhart@esso.ca",
     "david.evans@esso.ca",
     "daniel.k.nomanbhoy@exxonmobil.com"

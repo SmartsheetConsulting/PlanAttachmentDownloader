@@ -357,6 +357,8 @@ class ExportServiceInitialPullOnly:
         except:
             attachment_list_reader = csv.reader(open(attachment_manifest_path, 'r', encoding='iso8859-1'))
 
+        next(attachment_list_reader, None)  # skip header row
+
         for row in attachment_list_reader:
             try:
                 attachment_id = row[0]
