@@ -33,7 +33,7 @@ class ExportServiceInitialPullOnly:
         # ex. 12-11-2023_11-49-11_info.log
         info_log_file_name = f"{datetime.datetime.now().strftime('%m-%d-%Y_%H-%M-%S')}_info.log"
         info_log_file_path = os.path.join(log_folder, info_log_file_name)
-        info_file_handler = logging.FileHandler(info_log_file_path)
+        info_file_handler = logging.FileHandler(info_log_file_path, encoding='utf-8')
         info_file_handler.setFormatter(formatter)
         info_file_handler.setLevel(logging.INFO)
         logger.addHandler(info_file_handler)
@@ -41,7 +41,7 @@ class ExportServiceInitialPullOnly:
         # ex. 12-11-2023_11-49-11_errors.log
         error_log_file_name = f"{datetime.datetime.now().strftime('%m-%d-%Y_%H-%M-%S')}_errors.log"
         error_log_file_path = os.path.join(log_folder, error_log_file_name)
-        error_file_handler = logging.FileHandler(error_log_file_path)
+        error_file_handler = logging.FileHandler(error_log_file_path, encoding='utf-8')
         error_file_handler.setFormatter(formatter)
         error_file_handler.setLevel(logging.ERROR)
         logger.addHandler(error_file_handler)
