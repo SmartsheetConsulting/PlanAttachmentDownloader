@@ -33,7 +33,7 @@ class ExportServiceInitialPullOnly:
         # ex. 12-11-2023_11-49-11_info.log
         info_log_file_name = f"{datetime.datetime.now().strftime('%m-%d-%Y_%H-%M-%S')}_info.log"
         info_log_file_path = os.path.join(log_folder, info_log_file_name)
-        info_file_handler = logging.FileHandler(info_log_file_path, encoding='utf-8')
+        info_file_handler = logging.FileHandler(info_log_file_path, encoding='iso8859-1')
         info_file_handler.setFormatter(formatter)
         info_file_handler.setLevel(logging.INFO)
         logger.addHandler(info_file_handler)
@@ -41,7 +41,7 @@ class ExportServiceInitialPullOnly:
         # ex. 12-11-2023_11-49-11_errors.log
         error_log_file_name = f"{datetime.datetime.now().strftime('%m-%d-%Y_%H-%M-%S')}_errors.log"
         error_log_file_path = os.path.join(log_folder, error_log_file_name)
-        error_file_handler = logging.FileHandler(error_log_file_path, encoding='utf-8')
+        error_file_handler = logging.FileHandler(error_log_file_path, encoding='iso8859-1')
         error_file_handler.setFormatter(formatter)
         error_file_handler.setLevel(logging.ERROR)
         logger.addHandler(error_file_handler)
@@ -348,10 +348,7 @@ class ExportServiceInitialPullOnly:
             os.mkdir(parent_path)
 
         attachment_manifest_path = os.path.join(parent_path, 'all_attachments.csv')
-        try:
-            attachment_list_reader = csv.reader(open(attachment_manifest_path, 'r', encoding='utf-8'))
-        except:
-            attachment_list_reader = csv.reader(open(attachment_manifest_path, 'r', encoding='iso8859-1'))
+        attachment_list_reader = csv.reader(open(attachment_manifest_path, 'r', encoding='iso8859-1'))
 
         next(attachment_list_reader, None)  # skip header row
 
